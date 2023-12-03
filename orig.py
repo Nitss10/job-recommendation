@@ -37,7 +37,7 @@ df_data=spark.read.csv( "marketing_sample_for_naukri_com-jobs__20190701_20190830
 
 df_data.printSchema()
 
-df_data = df_data.limit(4000)
+#df_data = df_data.limit(4000)
 print('Initial no of rows in data frame:',df_data.count())
 print('Dropping rows with null values and empty strings')
 
