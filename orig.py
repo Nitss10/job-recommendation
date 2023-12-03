@@ -52,6 +52,8 @@ for column in columns:
     df = df.filter(col(column) != '')
 
 print('No of rows after dropping invalid data in data frame:',df.count())
+df = df.dropDuplicates()
+print('No of rows after dropping duplicate data in data frame:',df.count())
 
 print('No of cores:',multiprocessing.cpu_count())
 df = spark.createDataFrame(df.rdd.repartition(4))
@@ -89,7 +91,7 @@ user_input = {
     "Job Experience Required": "3-5 years",
     "Key Skills": "Java, SQL",
     "Role Category": "Programming",
-    "Location": "New York",
+    "Location": "Hyderabad",
     "Functional Area": "IT Software",
     "Industry": "IT-Software",
     "Role": "Software Developer"
@@ -115,6 +117,7 @@ vector_type="W2V" #IDF
 # Get the user's vectors
 user_job_title_vector = to_dense_array(transformed_user_df.first()["Job Title"+vector_type])
 user_key_skills_vector = to_dense_array(transformed_user_df.first()["Key Skills"+vector_type])
+user_location_vector = to_dense_array(transformed_user_df.first()["Location"+vector_type])
 
 # UDF to calculate cosine similarity
 def cosine_similarity_with_arrays(vector1_array, vector2_array):
@@ -126,10 +129,11 @@ cosine_with_arrays_udf = udf(cosine_similarity_with_arrays, FloatType())
 
 overall_start_time = time()
 
-df_comb.show(5)
+# df_comb.show(5)
 
 
 df_comb = df_comb.withColumn("job_title_similarity", cosine_with_arrays_udf(lit(user_job_title_vector), col("Job Title"+vector_type))) \
+                 .withColumn("location_similarity", cosine_with_arrays_udf(lit(user_location_vector), col("Location"+vector_type))) \
                  .withColumn("key_skills_similarity", cosine_with_arrays_udf(lit(user_key_skills_vector), col("Key Skills"+vector_type)))
 
 start_time = time()
@@ -140,14 +144,14 @@ print('Ending cosine calc:',end_time)
 print('Time taken to cosine calc:',end_time-start_time)
 
 threshold=0.4
-df_comb=df_comb.filter((col("job_title_similarity") > threshold) | (col("key_skills_similarity") > threshold))
-df_comb = df_comb.withColumn("total_similarity", (col("job_title_similarity") + col("key_skills_similarity")) / 2)
+df_comb=df_comb.filter((col("job_title_similarity") > threshold) | (col("key_skills_similarity") > threshold) | (col("location_similarity") > threshold))
+df_comb = df_comb.withColumn("total_similarity", (col("job_title_similarity") + col("key_skills_similarity") + col("location_similarity")) / 3)
 
 top_10_jobs = df_comb.orderBy("total_similarity", ascending=False).limit(10)
 
 start_time = time()
 print('Starting top 10 select calc:',start_time)
-top_10_jobs.select("Uniq Id", "Job Title", "Location", "total_similarity").show()
+top_10_jobs.select("Uniq Id", "Job Title", "Location", "Key Skills", "total_similarity").show()
 end_time = time()
 print('Ending top 10 select calc:',end_time)
 print('Time taken to top 10 select calc:',end_time-start_time)
